@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Υπολογισμός Θερμικών / Ψυκτικών Φορτίων</title>
+  <style>
+    :root {
+      --bg: #0b1020; /* deep navy */
+      --card: #161b2e;
+      --ink: #ecf1ff;
+      --muted: #a8b0c9;
+      --accent: #7c5cff; /* soft purple */
+      --accent-2: #2fe4a7; /* mint */
+      --danger: #ff6b6b;
+      --border: #232a45;
+      --warn: #ffd166;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 80% -10%, #1a1f35 0%, var(--bg) 45%), var(--bg);
+      color: var(--ink);
+      display: grid; place-items: start center;
+      padding: 16px;
+    }
+    .wrap { width: 100%; max-width: 980px; }
+    h1 { font-size: 1.25rem; margin: 0 0 12px; }
+    .sub { color: var(--muted); font-size: 0.92rem; margin-bottom: 18px; }
+
+    .card { background: linear-gradient(180deg, #181e32 0%, var(--card) 100%); border: 1px solid var(--border); border-radius: 18px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+
+    .grid { display: grid; gap: 12px; }
+    @media (min-width: 740px) { .grid.cols-2 { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 1000px) { .grid.cols-3 { grid-template-columns: repeat(3, 1fr); } }
+
+    label { display: block; font-size: 0.86rem; color: var(--muted); margin-bottom: 6px; }
+    input, select { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: #0d1326; color: var(--ink); outline: none; }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,92,255,0.18); }
+
+    .row { display: grid; gap: 12px; }
+    @media (min-width: 620px) { .row { grid-template-columns: 1fr 1fr; } }
+
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    button { cursor: pointer; border: 0; border-radius: 12px; padding: 12px 14px; font-weight: 600; }
+    .primary { background: linear-gradient(90deg, var(--accent) 0%, #5a3dff 100%); color: white; }
+    .ghost { background: transparent; color: var(--ink); border: 1px solid var(--border); }
+    .danger { background: var(--danger); color: white; }
+
+    .result { margin-top: 16px; display: grid; gap: 12px; }
+    .badge { display: inline-flex; gap: 8px; align-items: center; font-size: 0.86rem; color: var(--muted); }
+    .kpi { display: grid; gap: 6px; padding: 14px; border: 1px dashed var(--border); border-radius: 14px; background: #0e1428; }
+    .kpi b { font-size: 1.25rem; color: var(--accent-2); }
+    .list { display: grid; gap: 8px; }
+    .rowline { display: flex; justify-content: space-between; gap: 12px; font-size: 0.95rem; border-bottom: 1px dashed #222a48; padding-bottom: 6px; }
+
+    .muted { color: var(--muted); }
+    .hint { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+
+    .footer { margin-top: 14px; font-size: 0.8rem; color: var(--muted); opacity: 0.9; }
+    .chip { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#0f1833; border:1px solid var(--border); font-size: 0.75rem; color: var(--muted); }
+    .tests { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--border); }
+    .warn { border-left: 3px solid var(--warn); padding: 8px 10px; background:#2a2233; border-radius: 10px; color: var(--warn); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Υπολογισμός Θερμικών / Ψυκτικών Φορτίων</h1>
+      <div class="sub">Δώσε γεωμετρία, θερμοκρασίες και βασικές επιλογές. Το εργαλείο επιστρέφει συνολικό φορτίο και ανάλυση ανά στοιχείο. <span class="chip">Mobile friendly</span></div>
+
+      <div class="grid cols-3" style="margin-bottom:6px">
+        <div>
+          <label>Λειτουργία</label>
+          <select id="mode">
+            <option value="cool">Ψύξη</option>
+            <option value="heat">Θέρμανση</option>
+          </select>
+        </div>
+        <div>
+          <label>Μέθοδος για μη θερμαινόμενο</label>
+          <select id="unheatedMethod">
+            <option value="factor" selected>Factor × ΔT</option>
+            <option value="temp">Θερμοκρασία γειτονικού</option>
+          </select>
+        </div>
+        <div>
+          <label>T γειτονικού μη θερμ. (°C)</label>
+          <input type="number" id="Tadj" step="0.5" inputmode="decimal" value="15" />
+        </div>
+      </div>
+
+      <div class="grid cols-3">
+        <div>
+          <label>Μήκος (m)</label>
+          <input type="number" id="length" step="0.1" inputmode="decimal" placeholder="π.χ. 5.5" value="5.5" />
+        </div>
+        <div>
+          <label>Πλάτος (m)</label>
+          <input type="number" id="width" step="0.1" inputmode="decimal" placeholder="π.χ. 4.2" value="4.2" />
+        </div>
+        <div>
+          <label>Ύψος (m)</label>
+          <input type="number" id="height" step="0.1" inputmode="decimal" placeholder="π.χ. 2.8" value="2.8" />
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:12px">
+        <div>
+          <label>Επιφάνεια παραθύρων (m²)</label>
+          <input type="number" id="windowArea" step="0.1" inputmode="decimal" placeholder="π.χ. 4.0" value="4.0" />
+          <div class="hint">Σύνολο όλων των παραθύρων του χώρου.</div>
+        </div>
+        <div>
+          <label>Προσανατολισμός παραθύρων</label>
+          <select id="orientation">
+            <option value="1.0">Νότος</option>
+            <option value="1.2">Ανατολή</option>
+            <option value="1.3">Δύση</option>
+            <option value="0.8">Βορράς</option>
+          </select>
+          <div class="hint">Συντελεστής ηλιακού κέρδους (απλουστευμένος).</div>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:12px">
+        <div>
+          <label>Μόνωση τοίχων</label>
+          <select id="insulation">
+            <option value="0.5">Με μόνωση (U=0.50 W/m²K)</option>
+            <option value="1.5">Χωρίς μόνωση (U=1.50 W/m²K)</option>
+          </select>
+        </div>
+        <div>
+          <label>Τύπος τζαμιού</label>
+          <select id="glassType">
+            <option value="2.8">Διπλό (U=2.8 W/m²K)</option>
+            <option value="5.5">Μονό (U=5.5 W/m²K)</option>
+          </select>
+          <div class="hint">Ο U καλύπτει τις αγώγιμες απώλειες. Τα ηλιακά κέρδη μπαίνουν ξεχωριστά με SHGC.</div>
+
+          <label style="margin-top:10px; display:block;">SHGC (ηλιακός συντελεστής υαλοπινάκων)</label>
+          <select id="shgc">
+            <option value="0.55">Διπλό low‑e (~0.55)</option>
+            <option value="0.70" selected>Διπλό clear (~0.70)</option>
+            <option value="0.86">Μονό clear (~0.86)</option>
+          </select>
+
+          <label style="margin-top:10px; display:block;">Σκίαση παραθύρων</label>
+          <select id="shading">
+            <option value="1.0">Χωρίς σκίαση</option>
+            <option value="0.7">Ελαφρά σκίαση (κουρτίνες/ρόλερ)</option>
+            <option value="0.4">Ισχυρή σκίαση (σκίαστρα/τέντα)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ΝΕΟ: Τοίχοι προς διαφορετικούς χώρους (Option A) -->
+      <div class="grid cols-3" style="margin-top:12px">
+        <div>
+          <label>% τοίχων προς Εξωτερικό</label>
+          <input type="number" id="pctWallExt" step="1" inputmode="numeric" value="100" />
+          <div class="hint">Ποσοστό της καθαρής επιφάνειας τοίχων.</div>
+        </div>
+        <div>
+          <label>% τοίχων προς Μη θερμαινόμενο</label>
+          <input type="number" id="pctWallUnh" step="1" inputmode="numeric" value="0" />
+        </div>
+        <div>
+          <label>Factor προς Μη θερμαινόμενο</label>
+          <input type="number" id="facWallUnh" step="0.05" inputmode="decimal" value="0.5" />
+          <div class="hint">0.3–0.7 συνήθως. 1.0 = σαν εξωτερικό.</div>
+        </div>
+      </div>
+
+      <!-- ΝΕΟ: Επαφή οροφής/δαπέδου -->
+      <div class="grid cols-3" style="margin-top:12px">
+        <div>
+          <label>Έκθεση Οροφής</label>
+          <select id="roofExposure">
+            <option value="1.0">Προς εξωτερικό (1.0×ΔT)</option>
+            <option value="0.7">Προς σοφίτα μη θερμ. (0.7×ΔT)</option>
+          </select>
+        </div>
+        <div>
+          <label>Έκθεση Δαπέδου</label>
+          <select id="floorExposure">
+            <option value="ground">Προς έδαφος (με T_εδάφους)</option>
+            <option value="unheated">Προς μη θερμαινόμενο κάτω (0.5×ΔT)</option>
+            <option value="heated">Προς θερμαινόμενο κάτω (0×ΔT)</option>
+          </select>
+        </div>
+        <div>
+          <label>T εδάφους (°C)</label>
+          <input type="number" id="groundTemp" step="0.5" inputmode="decimal" value="18" />
+          <div class="hint">Ενδεικτικά: καλοκαίρι 18–20, χειμώνα 10–14.</div>
+        </div>
+      </div>
+
+      <!-- ΝΕΟ: U-values για οροφή/δάπεδο (βεβαιώσου ότι ΥΠΑΡΧΕΙ roofInsulation) -->
+      <div class="grid cols-2" style="margin-top:12px">
+        <div>
+          <label>U οροφής (W/m²K)</label>
+          <select id="roofInsulation">
+            <option value="0.35">Με μόνωση (0.35)</option>
+            <option value="1.0">Χωρίς μόνωση (1.00)</option>
+          </select>
+        </div>
+        <div>
+          <label>U δαπέδου (W/m²K)</label>
+          <select id="floorInsulation">
+            <option value="0.5">Με μόνωση (0.50)</option>
+            <option value="1.2">Χωρίς μόνωση (1.20)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <div>
+          <label>Air Changes / Hour (ACH)</label>
+          <input type="number" id="ach" step="0.1" inputmode="decimal" value="0.7" />
+          <div class="hint">Τυπικά 0.35–1.5. Σε παλιότερα κουφώματα/χαραμάδες: 0.7–1.2.</div>
+        </div>
+        <div>
+          <label>Εσωτερική θερμοκρασία (°C)</label>
+          <input type="number" id="tInside" step="0.1" inputmode="decimal" value="26" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Εξωτερική θερμοκρασία (°C)</label>
+          <input type="number" id="tOutside" step="0.1" inputmode="decimal" value="35" />
+        </div>
+        <div>
+          <label>Λήψη μονάδων</label>
+          <select id="units">
+            <option value="kW">kW</option>
+            <option value="W">W</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:12px">
+        <div>
+          <label>Άτομα στον χώρο</label>
+          <input type="number" id="nPeople" step="1" inputmode="numeric" value="2" />
+          <div class="hint">Για ψύξη: ~75–100 W/άτομο αισθητό φορτίο.</div>
+        </div>
+        <div>
+          <label>W/άτομο (αισθητό)</label>
+          <input type="number" id="peopleSens" step="5" inputmode="numeric" value="75" />
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:12px">
+        <div>
+          <label>Φωτισμός (W/m²)</label>
+          <input type="number" id="lightingWm2" step="1" inputmode="numeric" value="8" />
+        </div>
+        <div>
+          <label>Συσκευές / Plug loads (W)</label>
+          <input type="number" id="equipW" step="10" inputmode="numeric" value="200" />
+        </div>
+      </div>
+
+      <div class="btns">
+        <button class="primary" id="btnCalc">Υπολογισμός</button>
+        <button class="ghost" id="btnDemo">Demo τιμές (Αθήνα καλοκαίρι)</button>
+        <button class="ghost" id="btnTestCool">Test: Ψύξη – Δύση, χωρίς σκίαση</button>
+        <button class="ghost" id="btnTestHeat">Test: Θέρμανση – μονωμένο</button>
+        <button class="ghost" id="btnTestNowin">Test: Χωρίς παράθυρα</button>
+        <button class="ghost" id="btnTestWalls">Test: 60% εξωτερικοί / 30% μη θερμ.</button>
+        <button class="ghost" id="btnTestShade">Test: Δύση με ισχυρή σκίαση</button>
+        <button class="ghost" id="btnTestAttic">Test: Σοφίτα & έδαφος</button>
+        <button class="danger" id="btnReset">Reset</button>
+      </div>
+
+      <div class="result" id="result" aria-live="polite"></div>
+
+      <div class="footer">
+        Σημείωση: Απλοποιημένο μοντέλο. Οι U-values & συντελεστές είναι ενδεικτικοί για γρήγορη προεκτίμηση. 
+        <span class="tests">Περιλαμβάνονται extra test cases για γρήγορο έλεγχο συμπεριφοράς.</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const fmt = (x, units) => units === 'kW' ? (x/1000).toFixed(2) + ' kW' : x.toFixed(0) + ' W';
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+  function getNum(id, def=0){
+    const el = $(id);
+    if (!el) return def;
+    const v = parseFloat(el.value);
+    return isNaN(v) ? def : v;
+  }
+  function getStr(id, def=''){
+    const el = $(id);
+    return el ? el.value : def;
+  }
+
+  function calc() {
+    const warnings = [];
+    // Guard against missing critical inputs
+    const requiredIds = ["roofInsulation","floorInsulation","orientation","insulation","glassType"]; 
+    for (const rid of requiredIds){ if(!$(rid)) warnings.push(`Λείπει το πεδίο #${rid} — χρησιμοποιώ default.`); }
+
+    const L = getNum("length");
+    const W = getNum("width");
+    const H = getNum("height");
+    const Awin = getNum("windowArea");
+    const fOrient = parseFloat(getStr("orientation","1.0")) || 1.0;
+    const Uwall = getNum("insulation",0.5) || 0.5;
+    const Uglass = getNum("glassType",2.8) || 2.8;
+    const SHGC = getNum("shgc",0.7) || 0.7;
+    const shading = getNum("shading",1.0) || 1.0;
+    const Uroof = getNum("roofInsulation",0.35) || 0.35; // FIX: ensure element exists
+    const Ufloor = getNum("floorInsulation",0.5) || 0.5;
+    const roofExp = getNum("roofExposure",1.0) || 1.0; // factor on dT
+    const floorExp = getStr("floorExposure","ground");
+    const Tground = getNum("groundTemp",18);
+
+    // Option A percentages
+    let pExt = clamp(getNum("pctWallExt",100) / 100, 0, 1);
+    let pUnh = clamp(getNum("pctWallUnh",0) / 100, 0, 1);
+    const fUnh = clamp(getNum("facWallUnh",0.5), 0, 1);
+    if (pExt + pUnh > 1) { // ensure sum <= 1
+      pExt = clamp(1 - pUnh, 0, 1);
+    }
+    const pInt = clamp(1 - (pExt + pUnh), 0, 1); // towards same-setpoint → 0×ΔT
+
+    const ACH = getNum("ach",0.7);
+    const Tin = getNum("tInside",26);
+    const Tout = getNum("tOutside",35);
+    const units = getStr("units","kW");
+
+    const userMode = getStr("mode","cool");
+    const dTcool = Math.max(0, Tout - Tin); // για ψύξη
+    const dTheat = Math.max(0, Tin - Tout); // για θέρμανση
+    const mode = userMode === 'heat' ? 'Θέρμανση' : 'Ψύξη';
+    const dT = userMode === 'heat' ? dTheat : dTcool;
+
+    // Areas
+    const AwallsGross = 2 * H * (L + W);
+    const AwallsNet = Math.max(0, AwallsGross - Awin);
+    const A_ext = AwallsNet * pExt;
+    const A_unh = AwallsNet * pUnh;
+    const A_int = AwallsNet * pInt; // contributes ~0 since ΔT_eff≈0
+    const Aroof = L * W;
+    const Afloor = L * W;
+
+    // Transmission (W = A * U * dT_eff)
+    const Qwalls_ext = A_ext * Uwall * dT;
+    let Qwalls_unh;
+    const unheatedMethod = getStr("unheatedMethod","factor");
+    if (unheatedMethod === 'temp') {
+      const Tadj = getNum("Tadj", 15);
+      const dT_unh = Math.abs(Tadj - Tin);
+      Qwalls_unh = A_unh * Uwall * dT_unh;
+    } else {
+      Qwalls_unh = A_unh * Uwall * (fUnh * dT);
+    }
+    const Qwalls_int = 0; // A_int towards same setpoint assumed ~0
+    const Qwalls = Qwalls_ext + Qwalls_unh + Qwalls_int;
+
+    const Qroof = Aroof * Uroof * (roofExp * dT);
+
+    let Qfloor;
+    if (floorExp === 'ground') {
+      const dTg = Math.abs(Tground - Tin);
+      Qfloor = Afloor * Ufloor * dTg;
+    } else if (floorExp === 'unheated') {
+      Qfloor = Afloor * Ufloor * (0.5 * dT);
+    } else { // heated below
+      Qfloor = 0;
+    }
+
+    // Παράθυρα: αγωγιμότητα + ηλιακά (απλουστευμένα)
+    const QwinCond = Awin * Uglass * dT; // W
+    const solarMap = { '1.0': 350, '1.2': 450, '1.3': 500, '0.8': 120 }; // S,E,W,N W/m²
+    const Sinc = solarMap[String(fOrient)] || 350;
+    let QwinSolar = Awin * SHGC * Sinc * shading; // W
+    if (userMode === 'heat') QwinSolar = 0; // δεν αντισταθμίζουμε στη θέρμανση
+    const Qwindows = QwinCond + (userMode === 'heat' ? 0 : QwinSolar);
+
+    // Ventilation: Q = rho * cp * ACH * V/3600 * dT
+    // rho ≈ 1.2 kg/m³, cp ≈ 1005 J/kgK => 1.2*1005/3600 ≈ 0.335
+    const V = L * W * H;
+    const Qvent = 0.335 * ACH * V * dT; // Watts
+
+    // Εσωτερικά φορτία
+    const Afloor_m2 = Afloor;
+    const nPeople = getNum("nPeople",0);
+    const peopleSens = getNum("peopleSens",0);
+    const lightingWm2 = getNum("lightingWm2",0);
+    const equipW = getNum("equipW",0);
+    const Qlighting = lightingWm2 * Afloor_m2; // W
+    const Qpeople = nPeople * peopleSens; // W (αισθητό)
+    const Qequip = equipW; // W
+    let Qinternal = Qlighting + Qpeople + Qequip;
+    if (userMode === 'heat') Qinternal = 0; // στη θέρμανση δεν αφαιρούμε κέρδη // στη θέρμανση αφαιρούνται
+
+    let QtotalW = Qwalls + Qwindows + Qroof + Qfloor + Qvent + Qinternal;
+    if (QtotalW < 0) QtotalW = 0;
+
+    const warnHtml = warnings.length ? `<div class="warn">${warnings.join('<br>')}</div>` : '';
+
+    const out = `
+      <div class="badge">Λειτουργία: <b style="color:${mode==='Ψύξη'?'#2fe4a7':'#ffd166'}; margin-left:6px">${mode}</b> — ΔΤ = ${dT.toFixed(1)} °C</div>
+      ${warnHtml}
+      <div class="kpi"><div class="muted">Συνολικό φορτίο</div><b>${fmt(QtotalW, units)}</b></div>
+      <div class="list">
+        <div class="rowline"><span>Τοίχοι → Εξωτερικό (${(pExt*100).toFixed(0)}%)</span><span>${fmt(Qwalls_ext, units)}</span></div>
+        <div class="rowline"><span>Τοίχοι → Μη θερμαινόμενο (${(pUnh*100).toFixed(0)}%)</span><span>${fmt(Qwalls_unh, units)}</span></div>
+        <div class="rowline"><span>Παράθυρα (Αγωγιμότητα)</span><span>${fmt(QwinCond, units)}</span></div>
+        <div class=\"rowline\"><span>Παράθυρα (Ηλιακά)${userMode==='heat' ? ' — αγνοούνται στη θέρμανση' : ''}</span><span>${fmt(QwinSolar, units)}</span></div>
+        <div class="rowline"><span>Οροφή</span><span>${fmt(Qroof, units)}</span></div>
+        <div class="rowline"><span>Δάπεδο</span><span>${fmt(Qfloor, units)}</span></div>
+        <div class="rowline"><span>Αερισμός (ACH)</span><span>${fmt(Qvent, units)}</span></div>
+        <div class=\"rowline\"><span>Φωτισμός${userMode==='heat' ? ' — αγνοείται στη θέρμανση' : ''}</span><span>${fmt(Qlighting, units)}</span></div>
+        <div class=\"rowline\"><span>Άτομα (αισθητό)${userMode==='heat' ? ' — αγνοούνται στη θέρμανση' : ''}</span><span>${fmt(Qpeople, units)}</span></div>
+        <div class=\"rowline\"><span>Συσκευές${userMode==='heat' ? ' — αγνοούνται στη θέρμανση' : ''}</span><span>${fmt(Qequip, units)}</span></div>
+      </div>
+    `;
+
+    $("result").innerHTML = out;
+  }
+
+  // Actions
+  $("btnCalc").addEventListener('click', calc);
+  $("btnReset").addEventListener('click', () => { 
+    document.querySelectorAll('input').forEach(i=>i.value=''); 
+    $("result").innerHTML=''; 
+  });
+
+  // Existing demo (unchanged)
+  $("btnDemo").addEventListener('click', () => {
+    $("length").value = 6.0; $("width").value = 4.5; $("height").value = 2.8;
+    $("windowArea").value = 3.5; $("orientation").value = '1.3'; // West
+    $("insulation").value = '0.5'; $("glassType").value = '2.8';
+    $("roofInsulation").value = '0.35'; $("floorInsulation").value = '0.5';
+    $("ach").value = '0.7'; $("tInside").value = '26'; $("tOutside").value = '36';
+    $("pctWallExt").value = '100'; $("pctWallUnh").value = '0'; $("facWallUnh").value = '0.5';
+    $("roofExposure").value = '1.0'; $("floorExposure").value = 'ground'; $("groundTemp").value = '18';
+    $("units").value = 'kW';
+    calc();
+  });
+
+  // Added test cases (do NOT change existing ones)
+  $("btnTestCool").addEventListener('click', () => {
+    $("length").value = 6.0; $("width").value = 5.0; $("height").value = 2.8;
+    $("windowArea").value = 6.0; $("orientation").value = '1.3'; // West
+    $("insulation").value = '1.5'; $("glassType").value = '2.8';
+    $("roofInsulation").value = '1.0'; $("floorInsulation").value = '1.2';
+    $("ach").value = '1.0'; $("tInside").value = '26'; $("tOutside").value = '36';
+    $("pctWallExt").value = '70'; $("pctWallUnh").value = '20'; $("facWallUnh").value = '0.6';
+    $("roofExposure").value = '1.0'; $("floorExposure").value = 'unheated'; $("groundTemp").value = '20';
+    $("shgc").value = '0.70'; $("shading").value = '1.0';
+    $("nPeople").value = '3'; $("peopleSens").value = '90';
+    $("lightingWm2").value = '10'; $("equipW").value = '400';
+    $("units").value = 'kW';
+    calc();
+  });
+
+  $("btnTestHeat").addEventListener('click', () => {
+    $("length").value = 6.0; $("width").value = 4.0; $("height").value = 2.8;
+    $("windowArea").value = 2.5; $("orientation").value = '1.0'; // South (irrelevant for heating solar in this model)
+    $("insulation").value = '0.5'; $("glassType").value = '2.8';
+    $("roofInsulation").value = '0.35'; $("floorInsulation").value = '0.5';
+    $("ach").value = '0.5'; $("tInside").value = '21'; $("tOutside").value = '0';
+    $("pctWallExt").value = '60'; $("pctWallUnh").value = '30'; $("facWallUnh").value = '0.5';
+    $("roofExposure").value = '0.7'; $("floorExposure").value = 'ground'; $("groundTemp").value = '12';
+    $("shgc").value = '0.55'; $("shading").value = '1.0';
+    $("nPeople").value = '2'; $("peopleSens").value = '75';
+    $("lightingWm2").value = '5'; $("equipW").value = '150';
+    $("units").value = 'kW';
+    calc();
+  });
+
+  $("btnTestNowin").addEventListener('click', () => {
+    $("length").value = 5.0; $("width").value = 4.0; $("height").value = 2.7;
+    $("windowArea").value = 0.0; $("orientation").value = '1.0';
+    $("insulation").value = '1.5'; $("glassType").value = '2.8';
+    $("roofInsulation").value = '1.0'; $("floorInsulation").value = '1.2';
+    $("ach").value = '0.8'; $("tInside").value = '26'; $("tOutside").value = '36';
+    $("pctWallExt").value = '80'; $("pctWallUnh").value = '20'; $("facWallUnh").value = '0.5';
+    $("roofExposure").value = '1.0'; $("floorExposure").value = 'heated'; $("groundTemp").value = '18';
+    $("shgc").value = '0.70'; $("shading").value = '1.0';
+    $("nPeople").value = '1'; $("peopleSens").value = '80';
+    $("lightingWm2").value = '8'; $("equipW").value = '100';
+    $("units").value = 'kW';
+    calc();
+  });
+
+  $("btnTestWalls").addEventListener('click', () => {
+    $("pctWallExt").value = '60';
+    $("pctWallUnh").value = '30';
+    $("facWallUnh").value = '0.6';
+    calc();
+  });
+
+  // New extra tests
+  $("btnTestShade").addEventListener('click', () => {
+    $("orientation").value = '1.3'; // West
+    $("shading").value = '0.4'; // strong shading
+    $("windowArea").value = 6.0;
+    $("tInside").value = '26'; $("tOutside").value = '36';
+    $("units").value = 'kW';
+    calc();
+  });
+
+  $("btnTestAttic").addEventListener('click', () => {
+    $("roofExposure").value = '0.7'; // attic
+    $("floorExposure").value = 'ground';
+    $("groundTemp").value = '20';
+    $("tInside").value = '26'; $("tOutside").value = '36';
+    $("units").value = 'kW';
+    calc();
+  });
+
+  // Auto-calc on load with defaults
+  calc();
+})();
+</script>
+</body>
+</html>
